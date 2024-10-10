@@ -24,7 +24,7 @@ fn inputs(num_qubits: Int) -> (Int, Float64, Float64, List[Vec3], List[Vec3]):
         v_0.append(vec3(0.0, 0.0, 0.0))
 
     # nt_steps, dt, etol, r_0, v_0
-    return (400, 1e-8, 1e-9, r_0, v_0)
+    return (4q00, 1e-8, 1e-9, r_0, v_0)
 
 fn dist_to_laser_test(num_qubits: Int) raises:
     ion_trap_3d = Python.import_module("ion_trap_3d")
