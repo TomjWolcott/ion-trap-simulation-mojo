@@ -30,7 +30,7 @@ fn inputs(num_qubits: Int) -> (Int, Float64, Float64, Float64, Float64, List[Flo
         vs.append(0.0)
 
     # (n_tsteps, dt, etol, M, b, x_0, v_0)
-    return (1000000, 1e-10, 1e-8, M_Yb, 3e-20, xs, vs)
+    return (300000, 1e-10, 1e-8, M_Yb, 3e-20, xs, vs)
 
 fn total_energy_test(num_qubits: Int) raises:
     ion_trap_1d = Python.import_module("ion_trap_1d")

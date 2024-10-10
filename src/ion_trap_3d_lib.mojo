@@ -24,6 +24,8 @@ alias w: Vec3 = Vec3(5.7 * 2*pi*1e6, 5.7 * 2*pi*1e6, 1.5 * 2*pi*1e6, 0)
 alias laserWavelength: Float64 = 369 * 1e-9
 alias k: Float64 = (2*pi) / laserWavelength
 alias laserOrigin: Vec3 = Vec3(0, 0, 0, 0)
+
+# run-time functions aren't allowed in alias definitions, so sqrt_3 is here pre-calculated
 alias sqrt_3: Float64 = 1.7320508075688772935274463415058723669428
 alias kvector: Vec3 = Vec3( -k/sqrt_3, -k/sqrt_3, -k/sqrt_3, 0 )
 alias laserWidth: Float64 = 1e-6
