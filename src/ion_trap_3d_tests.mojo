@@ -13,18 +13,18 @@ fn main() raises:
     sim_leapfrog_test(40)
 #     sim_leapfrog_plot(3)
     sim_er_test(40)
-#     sim_er_plot(3)
+    sim_er_plot(3)
 
 fn inputs(num_qubits: Int) -> (Int, Float64, Float64, List[Vec3], List[Vec3]):
     r_0 = List[Vec3](capacity=num_qubits)
     v_0 = List[Vec3](capacity=num_qubits)
 
     for i in range(num_qubits):
-        r_0.append(vec3(0, 0, 4e-6 * ((i*i / 100.0) + i - (num_qubits - 1.0) / 2.0) + 1e-6))
+        r_0.append(vec3(0, 0, 5e-6 * (i - (num_qubits - 1.0) / 2.0 + 1e-7)))
         v_0.append(vec3(0.0, 0.0, 0.0))
 
     # nt_steps, dt, etol, r_0, v_0
-    return (300000, 1e-8, 1e-9, r_0, v_0)
+    return (400, 1e-8, 1e-9, r_0, v_0)
 
 fn dist_to_laser_test(num_qubits: Int) raises:
     ion_trap_3d = Python.import_module("ion_trap_3d")
@@ -144,7 +144,7 @@ fn sim_er_plot(num_qubits: Int) raises:
     var c_res_ = ion_trap_3d.sim_er(len(tup[3]), tup[0], tup[1], tup[2], to_pylist(tup[3]), to_pylist(tup[4]))
     var c_res = (from_pylist(c_res_[0]), from_pylist(c_res_[1]))
 
-#     var ax = plt.figure().add_subplot(projection='3d')
+    var ax = plt.figure().add_subplot(projection='3d')
 
     for i in range(len(tup[3])):
         var mojo_xs = Python.evaluate("[]")
@@ -164,13 +164,13 @@ fn sim_er_plot(num_qubits: Int) raises:
             c_zs.append(c_res[0][j][i][2])
             ts.append(j*tup[1])
 
-        plt.plot(ts, mojo_zs, label=str("q_m").__add__(str(i)))
-        plt.plot(ts, c_zs, label=str("q_c").__add__(str(i)))
-#         ax.plot(mojo_xs, mojo_ys, mojo_zs, label=str("q_m").__add__(str(i)))
-#         ax.plot(c_xs, c_ys, c_zs, label=str("q_c").__add__(str(i)))
+#         plt.plot(ts, mojo_zs, label=str("q_m").__add__(str(i)))
+#         plt.plot(ts, c_zs, label=str("q_c").__add__(str(i)))
+        ax.plot(mojo_xs, mojo_ys, mojo_zs, label=str("q_m").__add__(str(i)))
+        ax.plot(c_xs, c_ys, c_zs, label=str("q_c").__add__(str(i)))
 
-#     ax.legend()
-    plt.legend()
+    ax.legend()
+#     plt.legend()
     plt.show()
 
 fn to_pylist(lst: List[Vec3]) raises -> PythonObject:

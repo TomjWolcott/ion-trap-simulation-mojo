@@ -1,6 +1,8 @@
 from math import pi, sqrt, exp
 from mojo_utils import *
 
+# alias pi: Float64 = 3.14159265358979323846
+
 # physical constants
 alias Z: Float64 = 1
 alias e: Float64 = 1.60217883e-19
@@ -24,7 +26,6 @@ alias k: Float64 = (2*pi) / laserWavelength
 alias laserOrigin: Vec3 = Vec3(0, 0, 0, 0)
 alias sqrt_3: Float64 = 1.7320508075688772935274463415058723669428
 alias kvector: Vec3 = Vec3( -k/sqrt_3, -k/sqrt_3, -k/sqrt_3, 0 )
-alias kvector_length: Float64 = k # Update if kvector is going to regularly change
 alias laserWidth: Float64 = 1e-6
 
 alias decayRate: Float64 = 19.6 * 1e6 * 2*pi
@@ -73,6 +74,7 @@ fn acceleration(
 
 fn dist_to_laser(r: List[Vec3], k: Int) -> Float64:
     var rminuso = r[k] - laserOrigin
+    var kvector_length = sqrt(dot(kvector, kvector));
     var cross_product_length = length(cross(rminuso, kvector))
 
     return cross_product_length / kvector_length
@@ -83,6 +85,7 @@ fn acceleration(
     k: Int,
     laserWidth: Float64
 ) -> Vec3:
+    # Harmonic Potential force
     var a = -w*w * r[k]
 
     # Laser cooling
@@ -96,7 +99,7 @@ fn acceleration(
         if i != k:
             var dri_mag = length(r[k] - r[i])
             var dri = (r[k] - r[i]) / dri_mag
-            var ai_mag = ((Z*Z * e*e) / (4 * pi * eps0 * M_Yb)) * (1 / (dri_mag*dri_mag));
+            var ai_mag = ((Z*Z * e*e) / (4 * pi * eps0 * M_Yb)) * (1 / pow(dri_mag, 2));
 
             a += ai_mag * dri;
 

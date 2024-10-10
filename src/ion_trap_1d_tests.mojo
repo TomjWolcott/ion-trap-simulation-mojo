@@ -13,9 +13,9 @@ fn main() raises:
     neg_grad_energy_test(10)
     force1_test(10)
     simleapfrog_test(10)
-#     simleafrog_plot(5)
+    simleafrog_plot(5)
     sim_er_test(10)
-#     sim_er_plot(5)
+    sim_er_plot(5)
     sim_leapfrog_dless_test(10)
     sim_leapfrog_dless_plot(5)
 
@@ -24,10 +24,13 @@ fn inputs(num_qubits: Int) -> (Int, Float64, Float64, Float64, Float64, List[Flo
     var vs = List[Float64](capacity=num_qubits)
 
     for i in range(num_qubits):
+        # These are intentionally oddly spaced x values, I wanted to make sure that the c++ & mojo code match
+        # even when the positions are spaced sort of randomly
         xs.append(4e-6 * ((i*i / 100.0) + i - (num_qubits - 1.0) / 2.0) + 1e-6)
         vs.append(0.0)
+
     # (n_tsteps, dt, etol, M, b, x_0, v_0)
-    return (50000000, 1e-10, 1e-8, M_Yb, 3e-20, xs, vs)
+    return (1000000, 1e-10, 1e-8, M_Yb, 3e-20, xs, vs)
 
 fn total_energy_test(num_qubits: Int) raises:
     ion_trap_1d = Python.import_module("ion_trap_1d")
@@ -116,10 +119,8 @@ fn simleapfrog_test(num_qubits: Int) raises:
 
     var mojo_time = time.perf_counter()
     var mojo_res = sim_leapfrog(T, tup[1], tup[3], tup[5], tup[6])
-    print("sim_leap4")
     var mojo_last = len(mojo_res[0])-1
     mojo_time = time.perf_counter() - mojo_time
-    print("sim_leap5    ")
 
     print("Mojo: ", mojo_res[0][mojo_last][1], "", mojo_time, "s")
 

@@ -1,14 +1,14 @@
 from collections.list import List
 from mojo_utils import init_vector
+from math import pi
 
-alias PI = 3.14159265358979323846
 alias Z = 1.0
 alias e = 1.60217883e-19
 alias eps0 = 8.854187817e-12
 alias M_Yb = 2.8733965e-25
-alias nu = 0.25 * 2*PI*1e6
+alias nu = 0.25 * 2*pi*1e6
 
-alias l0 = pow(((Z*Z * e*e) / (4.0 * PI * eps0 * M_Yb * nu*nu)), 1.0/3.0)
+alias l0 = pow(((Z*Z * e*e) / (4.0 * pi * eps0 * M_Yb * nu*nu)), 1.0/3.0)
 alias m0 = M_Yb
 alias t0 = 1.0 / nu
 
@@ -21,7 +21,7 @@ fn total_energy(x: List[Float64]) -> Float64:
 
     for i in range(n):
         for j in range(i+1, n):
-            energy += ((Z*Z * e*e) / (4 * PI * eps0)) * (1 / abs(x[i] - x[j]))
+            energy += ((Z*Z * e*e) / (4 * pi * eps0)) * (1 / abs(x[i] - x[j]))
 
     return energy
 
@@ -38,7 +38,7 @@ fn force(x: List[Float64], k: Int) -> Float64:
 
     for i in range(len(x)):
         if i != k:
-            force += (1 if x[i] < x[k] else -1) * ((Z * Z * e * e) / (4*PI*eps0)) * (1 / ((x[k] - x[i]) * (x[k] - x[i])));
+            force += (1 if x[i] < x[k] else -1) * ((Z * Z * e * e) / (4*pi*eps0)) * (1 / ((x[k] - x[i]) * (x[k] - x[i])));
 
     return force
 
@@ -52,7 +52,7 @@ fn force(
 
     for i in range(len(x)):
         if i != k:
-            force += (1 if x[i] < x[k] else -1) * ((Z * Z * e * e) / (4*PI*eps0)) * (1 / ((x[k] - x[i]) * (x[k] - x[i])))
+            force += (1 if x[i] < x[k] else -1) * ((Z * Z * e * e) / (4*pi*eps0)) * (1 / ((x[k] - x[i]) * (x[k] - x[i])))
 
     return force
 
@@ -154,7 +154,7 @@ fn sim_leapfrog_dless(
     owned x_0: List[Float64],
     owned v_0: List[Float64]
 ) -> (List[List[Float64]], List[List[Float64]]):
-    var l0 = pow(((Z*Z * e*e) / (4.0 * PI * eps0 * M_Yb * nu*nu)), 1.0/3.0)
+    var l0 = pow(((Z*Z * e*e) / (4.0 * pi * eps0 * M_Yb * nu*nu)), 1.0/3.0)
 
     T = T / t0
     dt = dt / t0

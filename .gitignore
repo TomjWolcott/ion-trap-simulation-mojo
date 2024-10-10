@@ -4,4 +4,8 @@ build
 ion_trap_1d.cpp
 ion_trap_3d.cpp
 ion_trap_ring.cpp
-*cpython-37m-darwin.so
+*cpython-37m-darwin.so# pixi environments
+.pixi
+*.egg-info
+# magic environments
+.magic

@@ -67,7 +67,7 @@ double force(
     vector<double>& x,
     vector<double>& v,
     const int k,
-    const int b
+    const double b
     )
 {
     double force = -M_Yb * (nu * nu) * x[k] - b*v[k];
