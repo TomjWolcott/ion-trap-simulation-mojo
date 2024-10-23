@@ -8,6 +8,9 @@ fn vec3(x: Float64, y: Float64, z: Float64) -> Vec3:
 fn length(v: Vec3) -> Float64:
     return math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
 
+fn lengthN[dims: Int](v: dims) -> Float64:
+    return math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+
 fn normalize(v: Vec3) -> Vec3:
     var l = length(v)
     return Vec3(v[0]/l, v[1]/l, v[2]/l)

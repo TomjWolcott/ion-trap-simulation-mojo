@@ -45,11 +45,11 @@ fn acceleration(
         if i != k:
             var dri_mag = length(r[k] - r[i])
             var dri = (r[k] - r[i]) / dri_mag
-            var ai_mag = ((Z*Z * e*e) / (4 * pi * eps0 * M_Yb)) * (1 / (dri_mag*dri_mag));
+            var ai_mag = ((Z*Z * e*e) / (4 * pi * eps0 * M_Yb)) * (1 / (dri_mag*dri_mag))
 
-            a += ai_mag * dri;
+            a += ai_mag * dri
 
-    return a;
+    return a
 
 fn acceleration(
     r: List[Vec3],
