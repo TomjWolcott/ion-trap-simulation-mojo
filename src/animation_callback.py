@@ -1,6 +1,5 @@
-def callback(xs, ys, zs, np, ax, scatter):
+def callback(xs, ys, zs, np, ax):
     def x(i):
-        scatter.set_offsets(np.c_(xs[i], ys[i], zs[i]))
-        return None
+        return [ax.scatter(xs[i], ys[i], zs[i], c="red")]
 
     return x
