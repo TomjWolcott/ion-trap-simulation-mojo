@@ -90,12 +90,16 @@ struct RingPsuedoPotential(Potential3D, GetEquilibriumPositions):
         self.wr = other.wr
         self.wz = other.wz
 
+    fn adapt_to_structure_constant(inout self, linear_particle_density: Float64, num_ions: Int, mass: Float64):
+        self.wz = self.wr
+        self.radius = num_ions / (2 * pi * linear_particle_density) * pow(3.0 * e*e / (8.0 * pi * eps0 * self.wr*self.wr * mass), 1.0 / 3.0)
+
     fn force(self, t: Float64, xs: List[Vec3], vs: List[Vec3], k: Int, mass: Float64) -> Vec3:
         var r: Float64 = sqrt(xs[k][0]*xs[k][0] + xs[k][1]*xs[k][1])
 
         return -mass * vec3(
-            (self.wr*self.wr) * (r - self.radius) * (xs[k][0] / self.radius),
-            (self.wr*self.wr) * (r - self.radius) * (xs[k][1] / self.radius),
+            (self.wr*self.wr) * (r - self.radius) * (xs[k][0] / r),
+            (self.wr*self.wr) * (r - self.radius) * (xs[k][1] / r),
             (self.wz*self.wz) * xs[k][2]
         )
 
@@ -172,6 +176,7 @@ struct ElectricFieldPotential[field: fn(Float64, Vec3) -> Vec3](Potential3D):
         var field = self.field(t, xs[k])
 #         print("        energy:", field, xs[k])
         return dot(field, xs[k]) * e * Z
+
 
 struct CoulombDefect(Potential3D):
     var qs: List[Float64]

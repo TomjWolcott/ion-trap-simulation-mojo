@@ -3,6 +3,7 @@ from math import pi, sin, cos, sqrt, exp, floor, clamp, atan2
 from python import Python, PythonObject
 from potentials_3d import *
 import time
+import random
 
 alias Z = 1.0
 alias e = 1.60217883e-19
@@ -10,6 +11,23 @@ alias eps0 = 8.854187817e-12
 alias M_Yb = 2.8733965e-25
 alias hbar: Float64 = 1.05457182e-34
 
+struct VerticalLabel(Copyable, Movable, CollectionElement):
+    var t: Float64
+    var name: String
+
+    fn __init__(inout self, t: Float64, name: String):
+        self.t = t
+        self.name = name
+
+    fn __copyinit__(inout self, other: Self):
+        self.t = other.t
+        self.name = other.name
+
+    fn __moveinit__(inout self, owned other: Self):
+        self.t = other.t
+        self.name = other.name
+
+# Zigzag characterization
 fn main2() raises:
     var np = Python.import_module("numpy")
     var plt = Python.import_module("matplotlib.pyplot")
@@ -30,8 +48,8 @@ fn main2() raises:
 #
     for i in range(len(ns)):
         for j in range(len(ds)):
-            var n = int(ns[i].to_float64())
-            var radius = (ds[j].to_float64()) / (2*pi) * n
+            var n = int(float(ns[i]))
+            var radius = float(ds[j]) / (2*pi) * n
 
             var ion_trap_sim = IonTrapSim3D(
                 n,
@@ -40,7 +58,7 @@ fn main2() raises:
                 T=1e-5,
                 dt=5e-9
             )
-            ion_trap_sim.set_potential_equilibrium(ion_trap_sim.potential1)
+            ion_trap_sim.set_equilibrium_positions(ion_trap_sim.get_equilibrium_positions(ion_trap_sim.potential1))
             var converged = ion_trap_sim.optimize_equilibrium(1e-16, show_convergence=False)
 
             var d = 2*pi*radius / n
@@ -88,47 +106,90 @@ fn main2() raises:
     plt.show()
     print(tup)
 
-fn main():
+fn main4() raises:
     fn map_x0(i: Int, x: Vec3) -> Vec3:
-        return x / 1
+        return vec3(x[0] + random.random_float64(-5e-7, 5e-7), x[1] + random.random_float64(-5e-7, 5e-7), random.random_float64(-1e-6, 1e-6))
 
-    alias tilted_freq = 2*pi*3e5
-    alias t0 = 3e-5
+    var radius = 50.0 * 2e-6 / (2*pi)
+#     var defect_potential = CoulombDefect(List(0.5*e, 2*e), List(vec3(radius, 0, 5e-6), vec3(0, radius, 2e-6)))
+    var ring_potential = RingPsuedoPotential(radius = radius)
+
+    var ion_trap_sim = IonTrapSim3D(
+        200,
+        ring_potential,
+        CoulombPotential(),
+        T=1e-5,
+        dt=1e-9
+    )
+    ion_trap_sim.set_equilibrium_positions(ion_trap_sim.get_equilibrium_positions(ion_trap_sim.potential1))
+    ion_trap_sim.map_x_0[map_x0]()
+    _ = ion_trap_sim.optimize_equilibrium(1e-16)
+
+    var xs: List[List[Vec3]]
+    var ts: List[Float64]
+    xs,_,_,ts,_ = ion_trap_sim.sim_er()
+
+    fn extra_points(t: Float64) -> List[Vec3]:
+        return List(vec3(0, 0, 1e-6))
+
+    var nt = 1000
+    var nqubits = 4000
+    animated_plot[extra_points](xs, ion_trap_sim.dt, nt, nqubits, List[VerticalLabel](), radius=ring_potential.radius)
+
+# Animated ring simulations
+fn main() raises:
+    fn map_x0(i: Int, x: Vec3) -> Vec3:
+        return vec3(x[0] + random.random_float64(-5e-8, 5e-8), x[1] + random.random_float64(-5e-8, 5e-8), random.random_float64(-1e-7, 1e-7))
+
+    alias tilted_freq = 2*pi*2e5
+    alias t_acc = 2e-5
+    alias t_mag1 = 5e-5
+    alias t_mag2 = 7e-5
+    alias magnitude = 3e7
 
     fn edirection(t: Float64) -> Vec3:
-        var freq = (t/t0) * tilted_freq if t < t0 else tilted_freq
-        var angle = freq * t + 0.5
+        var freq = (t/t_acc) * tilted_freq / 2 if t < t_acc else tilted_freq
+        var angle = freq * t + 0.5123123
 
         return vec3(cos(angle), sin(angle), 0)
 
     fn emagnitude(t: Float64) -> Float64:
-        return 3e7 * (t0 - t) / t0 if t < t0 else 0
+        return magnitude if t < t_mag1 else (magnitude * (t_mag2 - t) / (t_mag2 - t_mag1) if t < t_mag2 else 0)
 
     fn efield(t: Float64, x: Vec3) -> Vec3:
         var dir = edirection(t)
+        var perp_dir = vec3(-dir[1], dir[0], 0)
 
-        var E = emagnitude(t) * dot(x, dir) * dir
+        var E = emagnitude(t) * (dot(x, dir) * dir - dot(x, perp_dir) * perp_dir)
 #         print("            efield:", E)
         return E
 
     var epotential = ElectricFieldPotential[efield]()
 
-    var radius = 40.0 * 2e-6 / (2*pi)
+    var radius = 10.0 * 2e-6 / (2*pi)
 #     var defect_potential = CoulombDefect(List(0.5*e, 2*e), List(vec3(radius, 0, 5e-6), vec3(0, radius, 2e-6)))
     var ring_potential = RingPsuedoPotential(radius = radius)
 
+#     ring_potential.adapt_to_structure_constant(0.95/3, 30, M_Yb)
+
+    fn tilted_efield(t: Float64, x: Vec3) -> Vec3:
+        return vec3(10, 0, 0)
+
+    var potential_tilt = ElectricFieldPotential[tilted_efield]()
+
     var ion_trap_sim_psuedo = IonTrapSim3D(
-        20,
+        6,
         ring_potential,
         CoulombPotential(),
         epotential,
+        potential_tilt,
 #         defect_potential,
-        T=5e-5,
-        dt=1e-10
+        T=1e-4,
+        dt=1e-11
     )
-    ion_trap_sim_psuedo.set_potential_equilibrium(ion_trap_sim_psuedo.potential1)
-    _ = ion_trap_sim_psuedo.optimize_equilibrium(1e-16, show_convergence=False)
+    ion_trap_sim_psuedo.set_equilibrium_positions(ion_trap_sim_psuedo.get_equilibrium_positions(ion_trap_sim_psuedo.potential1))
     ion_trap_sim_psuedo.map_x_0[map_x0]()
+    _ = ion_trap_sim_psuedo.optimize_equilibrium(3e-16, show_convergence=False)
 
     var micromotion_potential = ion_trap_sim_psuedo.potential1#.into_micro_motion_potential()
     var ion_trap_sim = IonTrapSim3D(
@@ -136,21 +197,107 @@ fn main():
         micromotion_potential,
         CoulombPotential(),
         epotential,
+        potential_tilt,
 #         defect_potential,
     )
 
     var xs: List[List[Vec3]]
+    var vs: List[List[Vec3]]
+    var ts: List[Float64]
 #     ion_trap_sim.v_0[0] = vec3(0, 50, 0)
-    xs,_,_,_,_ = ion_trap_sim.sim_er()
+    xs,vs,_,ts,_ = ion_trap_sim.sim_er()
+
+    var np = Python.import_module("numpy")
+
+#     var csv = String(List[UInt8](capacity=len(xs)*(len(xs[0]) * 6 + 1) * 51 + 300))
+#     var skip = 1
+#
+#     print("starting printing, n_tsteps:", len(xs), "n_ions:", len(xs[0]), "capacity: ", (len(xs)/skip)*(len(xs[0]) * 3 + 1) * 21 + 300)
+#     for j in range(-1, int(len(ts)/skip)):
+#         if j % 1000 == 0:
+#             print("done with row", j)
+#         for i in range(len(xs[0])*6+1):
+#             var i1 = int((i-1)/6)
+#             var i2 = int((i-1)/2) % 3
+#             var axis = List("x", "y", "z")[i2]
+#
+# #             if j >= 0:
+# #                 print(j, i1, i2, axis, xs[j*skip][i1], vs[j*skip][i1])
+#
+#             if j == -1 and i == 0:
+#                 csv += String("Time (s)")
+#             elif j == -1 and i % 2 == 0:
+#                 csv += String(", qubit #{} {}-position (m)").format(i1, axis)
+#             elif j == -1:
+#                 csv += String(", qubit #{} {}-velocity (m/s)").format(i1, axis)
+#             elif i == 0:
+#                 csv += String("\n {}").format(ts[j*skip])
+#             elif i % 2 == 0:
+#                 csv += String(", {}").format(xs[j*skip][i1][i2])
+#             else:
+#                 csv += String(", {}").format(vs[j*skip][i1][i2])
+#
+#     print("done w/ csv")
+#     var f = open("ring_trap_sim.csv", "rw")
+#
+#     f.write(csv)
+#     f.close()
+#     print("written!!")
 
     fn extra_points(t: Float64) -> List[Vec3]:
         return List(vec3(0, 0, 1e-6), 4e-6 * edirection(t))
 
-    var nt = 1000
+    var nt = 2000
     var nqubits = 4000
-    animated_plot[extra_points](xs, ion_trap_sim.dt, nt, nqubits, radius=ring_potential.radius)
+    animated_plot[extra_points](
+        xs,
+        ion_trap_sim.dt,
+        nt,
+        nqubits,
+        List(
+            VerticalLabel(t_acc, "Fully accelerated"),
+            VerticalLabel(t_mag1, "Pringle starts decreasing"),
+            VerticalLabel(t_mag2, "Pringle gone")
+        ),
+        radius=ring_potential.radius
+    )
 
-fn animated_plot[extra_points: fn(Float64) -> List[Vec3]](points: List[List[Vec3]], inout dt: Float64, inout nt: Int, inout nqubits: Int, radius: Float64 = 0.0):
+fn to_pylist(xs: List[List[Vec3]]) raises -> PythonObject:
+    var pylist = Python.evaluate("[]")
+
+    for i in range(len(xs[0])):
+        var x = Python.evaluate("[]")
+        var y = Python.evaluate("[]")
+        var z = Python.evaluate("[]")
+
+        for j in range(len(xs)):
+            x.append(xs[j][i][0])
+            y.append(xs[j][i][1])
+            z.append(xs[j][i][2])
+
+        pylist.append(x)
+        pylist.append(y)
+        pylist.append(z)
+    print("len(pylist) for List[List[Vec3]]", len(pylist), "inner", len(pylist[0]))
+    return pylist
+
+fn to_pylist(xs: List[Float64]) raises -> PythonObject:
+    var pylist = Python.evaluate("[]")
+
+    for i in range(len(xs)):
+        pylist.append(xs[i])
+
+    print("len(pylist) for List[Float64]", len(pylist))
+    return pylist
+
+fn animated_plot[extra_points: fn(Float64) -> List[Vec3]](
+    points: List[List[Vec3]],
+    inout dt: Float64,
+    inout nt: Int,
+    inout nqubits: Int,
+    vertical_lines: List[VerticalLabel],
+    radius: Float64 = 0.0
+):
     nt = min(len(points), nt)
     nqubits = min(len(points[0]), nqubits)
     print(nt, len(points), "|", nqubits, len(points[0]))
@@ -187,6 +334,7 @@ fn animated_plot[extra_points: fn(Float64) -> List[Vec3]](points: List[List[Vec3
 
         var ts = Python.evaluate("[]")
         var angle_vels = Python.evaluate("[]")
+        var rads = Python.evaluate("[]")
         for i1 in range(nt-1):
             var i = i1 * int(floor((len(points) - 1) / (nt - 1)))
             var x = Python.evaluate("[]")
@@ -195,6 +343,7 @@ fn animated_plot[extra_points: fn(Float64) -> List[Vec3]](points: List[List[Vec3
             var c = Python.evaluate("[]")
             var angle0 = atan2(points[i][0][1], points[i][0][0])
             var avr_freq = 0.0
+            var avr_rad = 0.0
 
             for j1 in range(nqubits):
                 var j = j1 * int(floor(len(points[i]) / nqubits))
@@ -220,10 +369,13 @@ fn animated_plot[extra_points: fn(Float64) -> List[Vec3]](points: List[List[Vec3
                 var after_angle = atan2(points[i+1][j][1], points[i+1][j][0])
                 var w = (after_angle-angle) / dt
                 avr_freq += w / (2*pi*nqubits)
+                avr_rad += radius / nqubits
 
             var t = i * dt
-            ts.append(t)
-            angle_vels.append(avr_freq)
+            if abs(avr_freq) < 1e8:
+                ts.append(t)
+                angle_vels.append(avr_freq)
+                rads.append(avr_rad)
 
             for point in extra_points(t):
                 x.append(point[][0])
@@ -247,13 +399,36 @@ fn animated_plot[extra_points: fn(Float64) -> List[Vec3]](points: List[List[Vec3
         )
 
         ax.set_aspect('equal', share=True, adjustable="datalim")
+
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+        ax.set_zlabel("z (m)")
         plt.show()
+#         plt.clf()
         print(anim)
 
         plt.plot(ts, angle_vels)
         plt.xlabel("time (s)")
         plt.ylabel("average rotational frequency (Hz)")
         plt.title("Average rotational frequency vs time")
+
+        for label in vertical_lines:
+            plt.axvline(label[].t, color='r', ls=':')
+            plt.text(label[].t, 0, label[].name, color='r', ha='right', va='bottom', rotation=90)
+
+        plt.show()
+
+        plt.plot(ts, rads, label="Average radius")
+        plt.plot(ts, np.ones(len(ts)) * radius, label="Trap radius")
+        plt.xlabel("time (s)")
+        plt.ylabel("Radius (m)")
+        plt.legend()
+        plt.title("Average radius vs time")
+
+        for label in vertical_lines:
+            plt.axvline(label[].t, color='r', ls=':')
+            plt.text(label[].t, radius, label[].name, color='r', ha='right', va='bottom', rotation=90)
+
         plt.show()
     except e:
         print(e)
@@ -363,8 +538,11 @@ struct IonTrapSim3D[
         self.etol = other.etol
         self.mass = other.mass
 
-    fn set_potential_equilibrium[P: GetEquilibriumPositions](inout self, potential: P):
-        self.x_0 = potential.get_equilibrium_positions(self.n)
+    fn get_equilibrium_positions[P: GetEquilibriumPositions](self, potential: P) -> List[Vec3]:
+        return potential.get_equilibrium_positions(self.n)
+
+    fn set_equilibrium_positions(inout self, owned positions: List[Vec3]):
+        self.x_0 = positions
         self.v_0 = init_vector[Vec3](self.n, Vec3(0, 0, 0))
 
     fn optimize_equilibrium(inout self, owned rate: Float64, show_convergence: Bool = True) -> Bool:
@@ -392,7 +570,8 @@ struct IonTrapSim3D[
                     max_acc = max(length(acc), max_acc)
                     total_energy += self.total_energy(0, x, self.v_0, k)
 #                     ys[k].append(length(x[k]))
-                    ys[k].append(atan2(x[k][1], x[k][0]))
+#                     ys[k].append(atan2(x[k][1], x[k][0]))
+                    ys[k].append(x[k][2])
 #                 if prev_total_energy > total_energy:
 #                     updating_rate *= 1.1
 #                 else:
