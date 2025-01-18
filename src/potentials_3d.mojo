@@ -71,6 +71,42 @@ struct LaserPotential(Potential3D):
         # TBD
         return 0.0
 
+struct RingTrapPotential(Potential3D):
+    var radius: Float64
+    var rf_freq_opt: Variant[None, Float64]
+    # Secular frequencies for radial and normal directions
+    var wr: Float64
+    var wz: Float64
+
+    fn __init__(inout self):
+        self = Self(40 * 1e-6)
+
+    fn __init__(inout self, radius: Float64, rf_freq: Float64 = 100 * 2*pi*1e6, wr: Float64 = 9 * 2*pi*1e6, wz: Float64 = 10 * 2*pi*1e6):
+        self.radius = radius
+        self.rf_freq = rf_freq
+        self.wr = wr
+        self.wz = wz
+
+    fn __copyinit__(inout self, other: Self):
+        self.radius = other.radius
+        self.rf_freq = other.rf_freq
+        self.wr = other.wr
+        self.wz = other.wz
+
+    fn force(self, t: Float64, xs: List[Vec3], vs: List[Vec3], k: Int, mass: Float64) -> Vec3:
+        var r: Float64 = sqrt(xs[k][0]*xs[k][0] + xs[k][1]*xs[k][1])
+
+        return -sqrt(2) * mass * self.rf_freq * cos(self.rf_freq * t) * vec3(
+            self.wr * (r - self.radius) * (xs[k][0] / r),
+            self.wr * (r - self.radius) * (xs[k][1] / r),
+            -self.wz * xs[k][2]
+        )
+
+    fn energy(self, t: Float64, xs: List[Vec3], vs: List[Vec3], k: Int, mass: Float64) -> Float64:
+        var r: Float64 = sqrt(xs[k][0]*xs[k][0] + xs[k][1]*xs[k][1])
+
+        return mass * self.rf_freq * sin(self.rf_freq * t) * (self.wr * pow(r - self.radius, 2) / 2 + self.wz * pow(xs[k][2], 2) / 2)
+
 struct RingPsuedoPotential(Potential3D, GetEquilibriumPositions):
     var radius: Float64
     # Secular frequencies for radial and normal directions
@@ -150,8 +186,8 @@ struct RingMicroMotionPotential(Potential3D):
         var r: Float64 = sqrt(xs[k][0]*xs[k][0] + xs[k][1]*xs[k][1])
 
         return -sqrt(2) * mass * self.rf_freq * cos(self.rf_freq * t) * vec3(
-            self.wr * (r - self.radius) * (xs[k][0] / self.radius),
-            self.wr * (r - self.radius) * (xs[k][1] / self.radius),
+            self.wr * (r - self.radius) * (xs[k][0] / r),
+            self.wr * (r - self.radius) * (xs[k][1] / r),
             -self.wz * xs[k][2]
         )
 

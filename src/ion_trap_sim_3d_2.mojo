@@ -2,6 +2,7 @@ from mojo_utils import *
 from math import pi, sin, cos, sqrt, exp, floor, clamp, atan2
 from python import Python, PythonObject
 from potentials_3d import *
+from utils import Variant
 import time
 import random
 import os
@@ -27,335 +28,6 @@ struct VerticalLabel(Copyable, Movable, CollectionElement):
     fn __moveinit__(inout self, owned other: Self):
         self.t = other.t
         self.name = other.name
-
-# Zigzag characterization
-fn main2() raises:
-    var np = Python.import_module("numpy")
-    var plt = Python.import_module("matplotlib.pyplot")
-    var cm = Python.import_module("matplotlib.cm")
-    var fig = plt.figure()
-    var ax = fig.add_subplot(projection='3d')
-
-    var ns = np.linspace(10, 300, 10)
-    var ds = np.linspace(1e-7, 1e-6, 30)
-    var drs = np.zeros((len(ns), len(ds)))
-    var xs = Python.evaluate("[]")
-    var ys = Python.evaluate("[]")
-    var zs = Python.evaluate("[]")
-
-    var rs = Python.evaluate("[]")
-#     var drs = Python.evaluate("[]")
-    var colors = Python.evaluate("[]")
-#
-    for i in range(len(ns)):
-        for j in range(len(ds)):
-            var n = int(float(ns[i]))
-            var radius = float(ds[j]) / (2*pi) * n
-
-            var ion_trap_sim = IonTrapSim3D(
-                n,
-                RingPsuedoPotential(radius),
-                CoulombPotential(),
-                T=1e-5,
-                dt=5e-9
-            )
-            ion_trap_sim.set_equilibrium_positions(ion_trap_sim.get_equilibrium_positions(ion_trap_sim.potential1))
-            var converged = ion_trap_sim.optimize_equilibrium(1e-16, show_convergence=False)
-
-            var d = 2*pi*radius / n
-            var dr = abs(length(ion_trap_sim.x_0[0]) - length(ion_trap_sim.x_0[1]))
-
-            dr = clamp(dr, 1e-19, 1e-5)
-            print("i:", i, "n:", n, "radius:", radius, "convergence:", converged, "dr:", dr)
-
-#             rs.append(radius)
-#             drs.append(dr)
-            xs.append(radius)
-            ys.append()
-            np.put(drs, i+len(ns)*j, dr)
-
-            if converged:
-                colors.append("red")
-            else:
-                colors.append("blue")
-
-#     var ns = np.linspace(-2, 2, 30)
-#     var ds = np.linspace(-2, 3, 40)
-    print("hi")
-    var tup = np.meshgrid(ns, ds)
-#     print("hi again")
-#     var qs = np.zeros((len(ns), len(ds)))
-#
-#     for i in range(len(ns)):
-#         for j in range(len(ds)):
-#             np.put(qs, i+len(ns)*j, sin(ns[i].to_float64())*ds[j].to_float64())
-#             print("(",i,",",j,")", qs[i][j])
-
-    ns, ds = tup[0], tup[1] # tuple (and its info) is dropped here unless you reference it below
-    print("yo watup")
-#     print(qs)
-#     ax.set_zscale("log")
-    ax.set_zlim(1e-19, 1e-5)
-#     ax.plot_trisurf(ns.flatten(), ds.flatten(), drs.flatten(), linewidth = 1, antialiased = True, cmap=cm.Blues)
-    ax.scatter(ns.flatten(), ds.flatten(), drs.flatten(), c=colors)
-#     ax.plot(rs, drs)
-    ax.set_xlabel("number of ions")
-    ax.set_ylabel("ion-ion distance (m)")
-    ax.set_zlabel("Adjacent ion absolute radius difference (m)")
-
-    plt.title("Radial length difference vs ion-ion arc distance")
-    plt.show()
-    print(tup)
-
-fn main4() raises:
-    fn map_x0(i: Int, x: Vec3) -> Vec3:
-        return vec3(x[0] + random.random_float64(-5e-7, 5e-7), x[1] + random.random_float64(-5e-7, 5e-7), random.random_float64(-1e-6, 1e-6))
-
-    var radius = 20.0 * 2e-6 / (2*pi)
-#     var defect_potential = CoulombDefect(List(0.5*e, 2*e), List(vec3(radius, 0, 5e-6), vec3(0, radius, 2e-6)))
-    var ring_potential = RingPsuedoPotential(radius = radius)
-
-    var ion_trap_sim = IonTrapSim3D(
-        200,
-        ring_potential,
-        CoulombPotential(),
-        T=1e-5,
-        dt=1e-9
-    )
-    ion_trap_sim.set_equilibrium_positions(ion_trap_sim.get_equilibrium_positions(ion_trap_sim.potential1))
-    ion_trap_sim.map_x_0[map_x0]()
-    _ = ion_trap_sim.optimize_equilibrium(1e-16)
-
-    var xs: List[List[Vec3]]
-    var ts: List[Float64]
-    xs,_,_,ts,_ = ion_trap_sim.sim_er()
-
-    fn extra_points(t: Float64) -> List[Vec3]:
-        return List(vec3(0, 0, 1e-6))
-
-    var nt = 1000
-    var nqubits = 4000
-    animated_plot[extra_points](xs, ion_trap_sim.dt, nt, nqubits, List[VerticalLabel](), radius=ring_potential.radius)
-
-# Animated ring simulations
-fn main7() raises:
-    fn map_x0(i: Int, x: Vec3) -> Vec3:
-        return vec3(x[0] + random.random_float64(-5e-8, 5e-8), x[1] + random.random_float64(-5e-8, 5e-8), random.random_float64(-1e-7, 1e-7))
-
-    alias tilted_freq = 2*pi*4e5
-    alias t_acc1 = 17e-4
-    alias t_acc2 = 21e-4
-    alias t_mag0 = 15e-4
-    alias t_mag1 = 22e-4
-    alias t_mag2 = 26e-4
-    alias magnitude = 0.1e7
-
-    fn edirection(t: Float64) -> Vec3:
-        var freq = 0 if t < t_acc1 else (((t - t_acc1)/(t_acc2 - t_acc1)) * tilted_freq / 2 if t < t_acc2 else tilted_freq)
-        var angle = freq * (t - t_acc1)
-
-        return vec3(cos(angle), sin(angle), 0)
-
-    fn emagnitude(t: Float64) -> Float64:
-        if t < t_mag0:
-            return t / t_mag0 * magnitude
-        elif t < t_mag1:
-            return magnitude
-        elif t < t_mag2:
-            return (magnitude * (t_mag2 - t) / (t_mag2 - t_mag1))
-        else:
-            return 0.0
-
-    fn efield(t: Float64, x: Vec3) -> Vec3:
-        var dir = edirection(t)
-        var perp_dir = vec3(-dir[1], dir[0], 0)
-
-        var E = emagnitude(t) * (dot(x, dir) * dir - dot(x, perp_dir) * perp_dir)
-#         if t % 1e-5 > 0.999999e-5:
-#             print("t: ", t, " - dir:", dir, " - mag:", emagnitude(t))
-        return E
-
-    var epotential = ElectricFieldPotential[efield]()
-
-    alias radius = 30.0 * 1e-6;
-#     var defect_potential = CoulombDefect(List(0.5*e, 2*e), List(vec3(radius, 0, 5e-6), vec3(0, radius, 2e-6)))
-    var ring_potential = RingPsuedoPotential(radius = radius)
-
-#     ring_potential.adapt_to_structure_constant(0.95/3, 30, M_Yb)
-
-    fn tilted_efield(t: Float64, x: Vec3) -> Vec3:
-        return vec3(0.5, 0, 0)
-
-    var potential_tilt = ElectricFieldPotential[tilted_efield]()
-
-    var ion_trap_sim_psuedo = IonTrapSim3D(
-        6,
-        ring_potential,
-        CoulombPotential(),
-        epotential,
-        potential_tilt,
-#         defect_potential,
-        T=3e-3,
-        dt=1e-10
-    )
-    ion_trap_sim_psuedo.set_equilibrium_positions(ion_trap_sim_psuedo.get_equilibrium_positions(ion_trap_sim_psuedo.potential1))
-    ion_trap_sim_psuedo.map_x_0[map_x0]()
-    _ = ion_trap_sim_psuedo.optimize_equilibrium(4e-16, show_convergence=False)
-
-    var micromotion_potential = ion_trap_sim_psuedo.potential1#.into_micro_motion_potential()
-    var ion_trap_sim = IonTrapSim3D(
-        ion_trap_sim_psuedo^,
-        micromotion_potential,
-        CoulombPotential(),
-        epotential,
-        potential_tilt,
-#         defect_potential,
-    )
-
-    var xs: List[List[Vec3]]
-    var vs: List[List[Vec3]]
-    var ts: List[Float64]
-#     ion_trap_sim.v_0[0] = vec3(0, 50, 0)
-    xs,vs,_,ts,_ = ion_trap_sim.sim_er()
-
-    var np = Python.import_module("numpy")
-
-    if True:
-        var csv = String(List[UInt8](capacity=len(xs)*(len(xs[0]) * 6 + 1) * 51 + 300))
-        var skip = 5
-        var bunch_len = 1000
-        var f = open("ring_trap_sim3.csv", "rw")
-        f.write(String(""))
-
-        print(len(ts))
-
-        print("starting printing, n_tsteps:", len(xs), "n_ions:", len(xs[0]), "capacity: ", (len(xs)/skip)*(len(xs[0]) * 3 + 1) * 21 + 300)
-        for k1 in range(0, int(len(ts)/skip/bunch_len)):
-            var csv = String("")
-            print("Done with row", k1*bunch_len);
-
-            for k2 in range(0, bunch_len):
-                var j = k1 * bunch_len + k2 - 1
-
-                for i in range(len(xs[0])*6+1):
-                    var i1 = int((i-1)/6)
-                    var i2 = int((i-1)/2) % 3
-                    var axis = List("x", "y", "z")[i2]
-
-        #             if j >= 0:
-        #                 print(j, i1, i2, axis, xs[j*skip][i1], vs[j*skip][i1])
-
-                    if j == -1 and i == 0:
-                        csv += String("Time (s)")
-                    elif j == -1 and i % 2 == 0:
-                        csv += String(", qubit #{} {}-position (m)").format(i1, axis)
-                    elif j == -1:
-                        csv += String(", qubit #{} {}-velocity (m/s)").format(i1, axis)
-                    elif i == 0:
-                        csv += String("\n {}").format(ts[j*skip])
-                    elif i % 2 == 0:
-                        csv += String(", {}").format(xs[j*skip][i1][i2])
-                    else:
-                        csv += String(", {}").format(vs[j*skip][i1][i2])
-
-            f.write(csv)
-    #         _ = f.seek(0, os.SEEK_END)
-
-    #     print("done w/ csv")
-    #     var f = open("ring_trap_sim.csv", "rw")
-    #
-    #     f.write(csv)
-        f.close()
-        print("written!!")
-
-    fn extra_points(t: Float64) -> List[Vec3]:
-        return List(vec3(0, 0, 1e-6), 1.2 * radius * edirection(t))
-
-    var nt = 40000
-    var nqubits = 4000
-    animated_plot[extra_points](
-        xs,
-        ion_trap_sim.dt,
-        nt,
-        nqubits,
-        List(
-            VerticalLabel(t_mag0, "Pringle is done strengthening"),
-            VerticalLabel(t_acc1, "Start acceleration"),
-            VerticalLabel(t_acc2, "Fully accelerated"),
-            VerticalLabel(t_mag1, "Pringle starts fading"),
-            VerticalLabel(t_mag2, "Pringle gone")
-        ),
-        radius=ring_potential.radius,
-        final_freq=tilted_freq
-    )
-
-# berkley paper comparisons
-fn main():
-    fn map_x0(i: Int, x: Vec3) -> Vec3:
-        return vec3(x[0] + 9e-6, x[1] + 9e-6, x[2])
-    alias radius = 45.0 * 1e-6
-    var ring_potential = RingPsuedoPotential(
-        radius = radius,
-        wr = 2 * pi * 390 * 1e3, # 2π * 390kHz
-        wz = 2 * pi * 390 * 1e3 # Assumption: IDK if they are exactly equivalent
-    )
-
-    fn tilted_efield(t: Float64, x: Vec3) -> Vec3:
-        return vec3(0, -2.5, 0)
-
-    var potential_tilt = ElectricFieldPotential[tilted_efield]()
-
-    var ion_trap_sim = IonTrapSim3D(
-        4,
-        ring_potential,
-        CoulombPotential(),
-        ElectricFieldPotential[tilted_efield](),
-        T=3e-3,
-        dt=1e-10
-    )
-
-    ion_trap_sim.set_equilibrium_positions(ion_trap_sim.get_equilibrium_positions(ion_trap_sim.potential1))
-    ion_trap_sim.map_x_0[map_x0]()
-    _ = ion_trap_sim.optimize_equilibrium(6e-16, show_convergence=False)
-
-    try:
-        var np = Python.import_module("numpy")
-        var plt = Python.import_module("matplotlib.pyplot")
-        var fig = plt.figure()
-        var ax = fig.add_subplot()
-        var xyz = to_pylist(ion_trap_sim.x_0)
-
-        var cs = Python.evaluate("[]")
-        var ss = Python.evaluate("[]")
-        var n = 200
-
-        for i in range(n+1):
-            cs.append(radius*cos(2*pi*i/n))
-            ss.append(radius*sin(2*pi*i/n))
-
-        ax.plot(cs, ss)
-
-        ax.scatter(xyz[0], xyz[1])
-        ax.set_xlabel("x (m)")
-        ax.set_ylabel("y (m)")
-
-        ax.set_aspect('equal', share=True, adjustable="datalim")
-#         ax.set_zlabel("z (m)")
-        plt.show()
-    except e:
-        print(e)
-
-fn to_pylist(xs: List[Vec3]) raises -> (PythonObject, PythonObject, PythonObject):
-    var x = Python.evaluate("[]")
-    var y = Python.evaluate("[]")
-    var z = Python.evaluate("[]")
-
-    for j in range(len(xs)):
-        x.append(xs[j][0])
-        y.append(xs[j][1])
-        z.append(xs[j][2])
-
-    return (x, y, z)
 
 fn to_pylist(xs: List[List[Vec3]]) raises -> PythonObject:
     var pylist = Python.evaluate("[]")
@@ -669,7 +341,7 @@ struct IonTrapSim3D[
                     total_energy += self.total_energy(0, x, self.v_0, k)
 #                     ys[k].append(length(x[k]))
 #                     ys[k].append(atan2(x[k][1], x[k][0]))
-                    ys[k].append(x[k][2])
+                    ys[k].append(math.sqrt(x[k][0]*x[k][0]+x[k][1]*x[k][1]))
 #                 if prev_total_energy > total_energy:
 #                     updating_rate *= 1.1
 #                 else:
@@ -703,13 +375,6 @@ struct IonTrapSim3D[
             self.x_0[k] = map(k, self.x_0[k])
 
     fn force(self, t: Float64, x: List[Vec3], v: List[Vec3], k: Int) -> Vec3:
-#         print("    x[k]", x[k])
-#         print("    p1.force", k, self.potential1.force(t, x, v, k, self.mass))
-#         print("    p2.force", k, self.potential2.force(t, x, v, k, self.mass))
-#         print("    p3.force", k, self.potential3.force(t, x, v, k, self.mass))
-#         print("    p4.force", k, self.potential4.force(t, x, v, k, self.mass))
-#         print("    p5.force", k, self.potential5.force(t, x, v, k, self.mass))
-
         return self.potential1.force(t, x, v, k, self.mass) +
             self.potential2.force(t, x, v, k, self.mass) +
             self.potential3.force(t, x, v, k, self.mass) +
@@ -717,13 +382,6 @@ struct IonTrapSim3D[
             self.potential5.force(t, x, v, k, self.mass)
 
     fn total_energy(self, t: Float64, x: List[Vec3], v: List[Vec3], k: Int) -> Float64:
-#         print("    x[k]", x[k])
-#         print("    p1.energy", k, self.potential1.energy(t, x, v, k, self.mass))
-#         print("    p2.energy", k, self.potential2.energy(t, x, v, k, self.mass))
-#         print("    p3.energy", k, self.potential3.energy(t, x, v, k, self.mass))
-#         print("    p4.energy", k, self.potential4.energy(t, x, v, k, self.mass))
-#         print("    p5.energy", k, self.potential5.energy(t, x, v, k, self.mass))
-
         return self.potential1.energy(t, x, v, k, self.mass) +
             self.potential2.energy(t, x, v, k, self.mass) +
             self.potential3.energy(t, x, v, k, self.mass) +
@@ -732,7 +390,7 @@ struct IonTrapSim3D[
 
     fn sim_er(
         self
-    ) -> (List[List[Vec3]], List[List[Vec3]], List[List[Vec3]], List[Float64], List[List[Float64]]):
+    ) -> GenericIonTrap3dResult:
         var t_start = time.perf_counter_ns()
         var x = init_vector[List[Vec3]](self.n_tsteps + 1, init_vector[Vec3](self.n, vec3(0, 0, 0)))
         var v = init_vector[List[Vec3]](self.n_tsteps + 1, init_vector[Vec3](self.n, vec3(0, 0, 0)))
@@ -780,46 +438,89 @@ struct IonTrapSim3D[
 
         var t_end = time.perf_counter_ns()
         print("sim_er took", (t_end-t_start)/1e9, "seconds with dt =", self.dt, "and n_tsteps =", self.n_tsteps)
-        return (x, v, a, t, err)
+        return GenericIonTrap3dResult(t, x, v, a, self.mass)
 
-trait IonTrap3dResult:
-    fn save_to_csv(self, filename: String): ...
 
-#     fn load_from_csv(filename: String) -> Self: ...
-#
-#     fn get_mode_energies(self, modes: List[int]) -> List[List[Float64]]: ...
-#
-#     fn animate_xyz(self): ...
+fn main() raises:
+    alias radius = 30.0 * 1e-6;
+    var ring_potential = RingPsuedoPotential(radius = radius)
+
+    var ion_trap_sim = IonTrapSim3D(
+        6,
+        ring_potential,
+        CoulombPotential(),
+        T=1e-4,
+        dt=1e-10
+    )
+    ion_trap_sim.set_equilibrium_positions(ion_trap_sim.get_equilibrium_positions(ion_trap_sim.potential1))
+    _ = ion_trap_sim.optimize_equilibrium(4e-16, show_convergence=True)
+    print("[sim_er]")
+    var result = ion_trap_sim.sim_er()
+    print("[eV vs t]")
+    result.plot_kinetic_energy_vs_time()
+    print("[save to csv]")
+    result.save_to_csv("temp_save.csv", 1)
+    print("[load from csv]")
+    var result2 = GenericIonTrap3dResult.load_from_csv("temp_save.csv")
+    print("[eV vs t]")
+    result2.plot_kinetic_energy_vs_time()
+
+    for i in range(100):
+        var diff = abs(result.t[i] - result2.t[i])
+
+        if diff > 1e-16:
+            print("[",i,"]: result.t[i]:", result.t[i], "result2.t[i]:", result2.t[i], "-- diff:", diff)
+
+trait IonTrap3dResult(Movable):
+    fn save_to_csv(self, filename: String, skip: Int, bunch_len: Int) raises: ...
+
+    @staticmethod
+    fn load_from_csv(filename: String, chunk_len: Int) raises -> Self: ...
+
+alias DEFAULT_SKIP = 10
+alias DEFAULT_BUNCH_LEN = 1000
+alias DEFAULT_CHUNK_LEN = 1000000
 
 struct GenericIonTrap3dResult(IonTrap3dResult):
     var t: List[Float64]
     var x: List[List[Vec3]]
     var v: List[List[Vec3]]
     var a: List[List[Vec3]]
+    var mass: Float64
 
-    fn __init__(inout self, t: List[Float64], x: List[List[Vec3]], v: List[List[Vec3]], a: List[List[Vec3]]):
+    fn __init__(inout self, t: List[Float64], x: List[List[Vec3]], v: List[List[Vec3]], a: List[List[Vec3]], mass: Float64):
         self.t = t
         self.x = x
         self.v = v
         self.a = a
+        self.mass = mass
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.t = existing.t
+        self.x = existing.x
+        self.v = existing.v
+        self.a = existing.a
+        self.mass = existing.mass
 
     # Empty header for the generic trap
-    fn save_to_csv(self, filename: String):
-        self.save_to_csv_with_header(self, filename, String("\n\n"))
+    fn save_to_csv(self, filename: String, skip: Int = DEFAULT_SKIP, bunch_len: Int = DEFAULT_BUNCH_LEN) raises:
+        self.save_to_csv_with_header(filename, "", skip, bunch_len)
 
-    fn save_to_csv_with_header(self, filename: String, header: String):
-        var skip = 10
-        var bunch_len = 1000
+    fn save_to_csv_with_header(self, filename: String, header: String, skip: Int, bunch_len: Int) raises:
         var f = open(filename, "rw")
         f.write(header)
 
+        f.write("\nmass, {}\n".format(self.mass))
+        f.write("Data:\n")
+
         for k1 in range(0, int(len(self.t)/skip/bunch_len)):
             var csv = String("")
+            print("Done with line #", k1 * bunch_len)
 
             for k2 in range(0, bunch_len):
                 var j = k1 * bunch_len + k2 - 1
 
-                for i in range(len(xs[0])*6+1):
+                for i in range(len(self.x[0])*6+1):
                     var i1 = int((i-1)/6)
                     var i2 = int((i-1)/2) % 3
                     var axis = List("x", "y", "z")[i2]
@@ -840,10 +541,277 @@ struct GenericIonTrap3dResult(IonTrap3dResult):
             f.write(csv)
 
         f.close()
-#
-# struct RingTrapResult(IonTrap3dResult):
-#     var trap_result: IonTrap3dResult
-#     var radial_potential: RingPsuedoPotential
-#
-#     fn save_to_csv(self, filename: String):
-#         self.trap_result.save_to_csv_with_header(filenmae, String("ring-trap-result,radius\n,{}").format(self.radial_potential.radius))
+
+    @staticmethod
+    fn load_parts_from_csv(filename: String, chunk_len: Int = DEFAULT_CHUNK_LEN) raises -> (String, List[Float64], List[List[Vec3]], List[List[Vec3]], List[List[Vec3]]):
+        var f = open(filename, "r")
+        var file_chunk = f.read(chunk_len)
+        var t = List[Float64]()
+        var x = List[List[Vec3]]()
+        var v = List[List[Vec3]]()
+        var a = List[List[Vec3]]()
+        var mass = -1.0
+        var num_lines = 0
+
+        var data_start_index = file_chunk.find("Data:\n")
+
+        # If "Data:" is in the csv, you can assume it has all other relevant info aswell
+        if data_start_index == -1:
+            raise Error("\"Data:\n\" is not found in the file")
+
+
+        var header = file_chunk[:data_start_index]
+        file_chunk = file_chunk[data_start_index + 6:]
+
+        while file_chunk.byte_length() > 0:
+            var lines = file_chunk.splitlines(False)
+
+            # The last line is likely only partially captured, so remove it and read it next time
+            if lines.size > 1:
+                var last_line = lines.pop()
+                _ = f.seek(-last_line.byte_length(), os.SEEK_CUR)
+
+            num_lines += lines.size
+
+            for line in lines:
+                var cells = List[Float64]()
+
+                for cell in line[].split(","):
+                    try:
+                        cells.append(string_to_float(cell[]))
+                    except e:
+                        continue
+
+                # 7 is the minimum # of columns this csv could have
+                if cells.size < 7:
+                    continue
+
+                if (cells.size - 1) % 6 != 0:
+                    raise Error(String("Row has an incorrect number of cells: {}").format(cells.size))
+
+                var num_ions = int((cells.size - 1) / 6)
+                var xs = List[Vec3]()
+                var vs = List[Vec3]()
+
+                for i in range(num_ions):
+                    xs.append(Vec3(cells[6 * i + 2], cells[6 * i + 4], cells[6 * i + 6]))
+                    vs.append(Vec3(cells[6 * i + 1], cells[6 * i + 3], cells[6 * i + 5]))
+
+                t.append(cells[0])
+                x.append(xs)
+                v.append(vs)
+                a.append(List[Vec3]())
+
+            file_chunk = f.read(chunk_len)
+
+            print("Finished {} lines".format(num_lines))
+
+        return (header, t, x, v, a)
+
+    @staticmethod
+    fn load_from_csv(filename: String, chunk_len: Int = DEFAULT_CHUNK_LEN) raises -> Self:
+        var header: String
+        var t: List[Float64]
+        var x: List[List[Vec3]]
+        var v: List[List[Vec3]]
+        var a: List[List[Vec3]]
+        (header, t, x, v, a) = GenericIonTrap3dResult.load_parts_from_csv(filename, chunk_len)
+
+        var mass = find_data(header, "mass")
+
+        return Self(t, x, v, a, mass)
+
+    fn plot_kinetic_energy_vs_time(self) raises:
+        var plt = Python.import_module("matplotlib.pyplot")
+        var ts = Python.evaluate("[]")
+        var energies = Python.evaluate("[]")
+
+        for i in range(self.v.size):
+            var energy = 0.0
+
+            for j in range(self.v[i].size):
+                energy += 0.5 * self.mass * dot(self.v[i][j], self.v[i][j])
+
+            energies.append(6.242e+18 * energy)
+            ts.append(self.t[i])
+
+        plt.plot(ts, energies)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Energy (eV)")
+        plt.show()
+
+struct RingTrapResult(IonTrap3dResult):
+    var result: GenericIonTrap3dResult
+    var radius: Float64
+    var wr: Float64
+    var wz: Float64
+    # If NoneType, the result was made using the psuedopotential, otherwise it was with micromotion
+    var rf_freq_opt: Variant[NoneType, Float64]
+
+    fn __init__(inout self, owned generic_result: GenericIonTrap3dResult, radius: Float64, wr: Float64, wz: Float64, rf_freq_opt: Variant[NoneType, Float64]):
+        self.result = generic_result^
+        self.radius = radius
+        self.wr = wr
+        self.wz = wz
+        self.rf_freq_opt = rf_freq_opt
+
+    fn __moveinit__(inout self, owned existing: Self):
+        self.result = existing.result^
+        self.radius = existing.radius
+        self.wr = existing.wr
+        self.wz = existing.wz
+        self.rf_freq_opt = existing.rf_freq_opt
+
+    fn save_to_csv(self, filename: String, skip: Int = DEFAULT_SKIP, bunch_len: Int = DEFAULT_BUNCH_LEN) raises:
+        var rf_freq_tag = String("")
+
+        # Only write out the rf_freq if the result is from micromotion
+        if self.rf_freq_opt.isa[Float64]():
+            rf_freq_tag = "rf_freq,{}\n".format(self.rf_freq_opt.unsafe_get[Float64]())
+
+        self.result.save_to_csv_with_header(
+            filename,
+            "ring-trap-result\nradius,{}\nwr,{}\nwz,{}\n{}".format(
+                self.radius,
+                self.wr,
+                self.wz,
+                rf_freq_tag
+            ),
+            skip,
+            bunch_len
+        )
+
+    @staticmethod
+    fn load_from_csv(filename: String, chunk_len: Int = DEFAULT_CHUNK_LEN) raises -> Self:
+        var header: String
+        var t: List[Float64]
+        var x: List[List[Vec3]]
+        var v: List[List[Vec3]]
+        var a: List[List[Vec3]]
+        (header, t, x, v, a) = GenericIonTrap3dResult.load_parts_from_csv(filename, chunk_len)
+
+        var mass = find_data(header, "mass")
+        var radius = find_data(header, "radius")
+        var wr = find_data(header, "wr")
+        var wz = find_data(header, "wz")
+        var rf_freq_opt: Variant = Variant[NoneType, Float64](None)
+
+        try:
+            var rf_freq = find_data(header, "rf_freq")
+            rf_freq_opt = Variant[NoneType, Float64](rf_freq)
+        except e:
+            pass
+
+        return Self(GenericIonTrap3dResult(t, x, v, a, mass), radius, wr, wz, rf_freq_opt)
+
+    fn show_animation(self, owned nt: Int) raises:
+        var dt = self.result.t[1] - self.result.t[0]
+        nt = min(len(self.result.x), nt)
+        nqubits = len(self.result.x[0])
+        print(nt, len(self.result.x), "|", nqubits, len(self.result.x[0]))
+        var np = Python.import_module("numpy")
+        var plt = Python.import_module("matplotlib.pyplot")
+        var animation = Python.import_module("matplotlib.animation")
+        var fig = plt.figure()
+        var ax = fig.add_subplot(projection='3d')
+        var artists = Python.evaluate("[]")
+        ax.scatter(Python.evaluate("[0]"), Python.evaluate("[0]"), Python.evaluate("[1e-9]"), c="green")
+        if self.radius > 0:
+            var cs = Python.evaluate("[]")
+            var ss = Python.evaluate("[]")
+            var n = 200
+
+            for i in range(n+1):
+                cs.append(self.radius*cos(2*pi*i/n))
+                ss.append(self.radius*sin(2*pi*i/n))
+            ax.plot(cs, ss, 0)
+
+        var ts = Python.evaluate("[]")
+        var angle_vels = Python.evaluate("[]")
+        var rads = Python.evaluate("[]")
+        for i1 in range(nt-1):
+            var i = i1 * int(floor((len(self.result.x) - 1) / (nt - 1)))
+            var x = Python.evaluate("[]")
+            var y = Python.evaluate("[]")
+            var z = Python.evaluate("[]")
+            var c = Python.evaluate("[]")
+            var angle0 = atan2(self.result.x[i][0][1], self.result.x[i][0][0])
+            var avr_freq = 0.0
+            var avr_rad = 0.0
+
+            for j1 in range(nqubits):
+                var j = j1 * int(floor(len(self.result.x[i]) / nqubits))
+                var angle = atan2(self.result.x[i][j][1], self.result.x[i][j][0])
+                var ion1_radius = length(vec3(self.result.x[i][j][0], self.result.x[i][j][1], 0))
+                var xNew = self.result.x[i][j][0]
+                var yNew = self.result.x[i][j][1]
+
+    #             xNew = ion1_radius * cos(angle - angle0)
+    #             yNew = ion1_radius * sin(angle - angle0)
+                x.append(xNew)
+                y.append(yNew)
+                z.append(self.result.x[i][j][2])
+                if j1 == 0:
+                    c.append("black")
+                elif j1 == 1:
+                    c.append("darkred")
+                elif j1 % 5 == 0:
+                    c.append("magenta")
+                else:
+                    c.append("red")
+
+                var after_angle = atan2(self.result.x[i+1][j][1], self.result.x[i+1][j][0])
+                var w = (after_angle-angle) / dt
+                avr_freq += w / (2*pi*nqubits)
+                avr_rad += self.radius / nqubits
+
+            var t = i * dt
+            if abs(avr_freq) < 1e8:
+                ts.append(t)
+                angle_vels.append(avr_freq)
+                rads.append(avr_rad)
+
+            artists.append(Python.evaluate("""lambda x, plt, t,n,avr_freq: [
+                x,
+                plt.gcf().text(0.1,0.1, 't={:.04e}s, avr_freq={:.04e} Hz'.format(t, avr_freq), style='italic', bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10}),
+                plt.gcf().text(0.1,0.9, '#ions={}, ion_0=black, ion_1=darkred, ion_5n=magenta'.format(n), style='italic', bbox={'facecolor': 'red', 'alpha': 0.5, 'pad': 10}),
+            ]""")(ax.scatter(x, y, z, c=c), plt, t,nqubits, avr_freq))
+
+
+        var anim = animation.ArtistAnimation(
+            fig,
+            artists,
+            50,
+            1000,
+            repeat=True
+        )
+
+        ax.set_aspect('equal', share=True, adjustable="datalim")
+
+        ax.set_xlabel("x (m)")
+        ax.set_ylabel("y (m)")
+        ax.set_zlabel("z (m)")
+        plt.show()
+
+fn string_to_float(str: String) raises -> Float64:
+    if "e" in str:
+        var parts = str.split("e")
+        return atof(parts[0]) * pow(10.0, atof(parts[1]))
+    else:
+        return atof(str)
+
+# Expects "{data_tag},{value}"
+fn find_data(file_chunk: String, data_tag: String) raises -> Float64:
+    var tag_index = file_chunk.find(data_tag + ",")
+    if tag_index == -1:
+        raise Error("Could not find \"{},\" tag in the file_chunk".format(data_tag))
+    var value_start_index = tag_index + data_tag.byte_length() + 1
+    var value_end_index = file_chunk[value_start_index:].find(",")
+
+    if value_end_index == -1:
+        value_end_index = file_chunk[value_start_index:].find("\n")
+
+        if value_end_index == -1:
+            valie_end_index = file_chunk.byte_length() - 1
+
+    return string_to_float(file_chunk[value_start_index:value_end_index])
