@@ -9,3 +9,4 @@ ion_trap_ring.cpp
 *.egg-info
 # magic environments
 .magic
+*.csv
